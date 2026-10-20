@@ -2183,7 +2183,7 @@ function setupView(){
     }
   }
   /* 3 difficulty */
-  h += sec(3, 'Difficulty', 'Higher levels weight defense and healing more.', '<div class="chips wrapped">' + RR.DIFFS.map(function(d){ return '<button class="chip" data-act="rdiff" data-v="' + d + '"' + pressed(r.diff === d) + '>' + d + '</button>'; }).join('') + '</div>' + diffInfo(r.diff) + '<div class="slot-n" style="margin-top:12px">Players</div><div class="chips wrapped">' + [1, 2, 3, 4].map(function(n){ return '<button class="chip" data-act="rplayers" data-v="' + n + '"' + pressed(r.players === n) + '>' + n + '</button>'; }).join('') + '</div><p class="small muted info">Enemy level estimates use the player count, since more players make the game harder.</p>');
+  h += sec(3, 'Difficulty', 'Higher levels weight defense and healing more.', '<div class="chips wrapped">' + RR.DIFFS.map(function(d){ return '<button class="chip" data-act="rdiff" data-v="' + d + '"' + pressed(r.diff === d) + '>' + d + '</button>'; }).join('') + '</div>' + diffInfo(r.diff));
   /* 4 artifacts */
   var have = RR.artUnlocked(), mine = R.ART.filter(function(a){ return have.indexOf(a.id) >= 0; }), rest = R.ART.filter(function(a){ return have.indexOf(a.id) < 0; });
   var ah = '<div class="chips wrapped">' + (mine.length ? mine.map(function(a){ return '<button class="chip" data-act="rart" data-id="' + a.id + '"' + pressed(r.arts.indexOf(a.id) >= 0) + '>' + esc(a.name.replace(/^Artifact of /, '')) + '</button>'; }).join('') : '<span class="small muted">No artifacts unlocked yet.</span>') + '</div>';
@@ -3284,7 +3284,7 @@ R.render();
 /* Standalone loader: keeps a second copy of every saved value in IndexedDB, restores it if the browser cleared
    localStorage, asks the browser to protect storage, then starts the app. */
 (function(){
-  window.ROR_STANDALONE = true; window.ROR_MEM = {}; window.ROR_BUILD = '24d9b4a';
+  window.ROR_STANDALONE = true; window.ROR_MEM = {}; window.ROR_BUILD = '04504bb';
   var DB = 'ror2-mirror', ST = 'kv', db = null, pend = {}, timer = 0, started = false;
   function openDb(cb){
     try{
