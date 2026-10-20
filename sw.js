@@ -1,6 +1,6 @@
 /* RoR2 Field Guide offline cache. Opens from the cache first, then fetches a fresh copy in the background so
    updates show up the next time the app is opened. Run progress is stored in the page, never in this cache. */
-var CACHE = 'ror2-c2797c2072';
+var CACHE = 'ror2-8ce4467115';
 var FILES = ['./', 'index.html', 'manifest.webmanifest', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(FILES); }).then(function(){ return self.skipWaiting(); }));

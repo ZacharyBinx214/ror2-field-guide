@@ -555,6 +555,21 @@ html[data-ts="xl"] .panel{max-height:calc(88dvh / 1.24)}
 
 .badge{max-width:100%}
 .meta .badge{white-space:normal;height:auto;min-height:20px;padding-top:4px;padding-bottom:4px;line-height:1.2}
+
+.rclock{display:grid;gap:8px}
+.rcrow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.rcbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.clk{font:700 34px/1.05 var(--display);font-variant-numeric:tabular-nums;letter-spacing:.02em;margin-top:4px}
+.rdl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px}
+.rcedit{display:grid;gap:6px}
+.tin{flex:1;min-width:0;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;font:16px var(--body, inherit)}
+.okc{color:var(--ok);font-weight:600}
+.splits{border-top:1px solid var(--line);padding-top:8px}
+
+.ic svg.cp{position:absolute;left:3px;top:3px;width:auto;height:auto;opacity:.78}
+.pipkey{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin:-4px 0 10px}
+.pipkey .pk{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.pipkey .pk svg{color:var(--fg);flex:none}
 </style></head><body>
 
 <header class="bar"><div class="wrap">
@@ -879,7 +894,7 @@ VIEWS.items = function(){
   var tags = Object.keys(tagCounts).sort().map(function(t){ return '<option value="' + t + '"' + (f.tag === t ? ' selected' : '') + '>' + esc(R.tagLabel(t)) + ' (' + tagCounts[t] + ')</option>'; }).join('');
   var L = filtered();
   var sysId = ({void:'void', hallowed:'hallowed', hex:'hex', pages:'pages'})[f.tier];
-  var h = '<h2 class="h-page">Item database</h2><p class="lede">' + ITEMS.length + ' items and equipment from the base game and all four expansions. Tap an item for stacking math, combos and how to get it.</p>' +
+  var h = '<h2 class="h-page">Item database</h2><p class="lede">' + ITEMS.length + ' items and equipment from the base game and all four expansions. Tap an item for stacking math, combos and how to get it.</p><div class="pipkey small muted" aria-label="Corner mark key">Corner mark: ' + (R.pipKey ? R.pipKey() : '') + '</div>' +
     '<div class="filters"><div class="chips" role="group" aria-label="Tier">' + tc + '</div><div class="chips" role="group" aria-label="Source">' + dc + '</div>' +
     '<div class="selrow"><select class="sel" data-sel="filtSel" data-k="tag" aria-label="Filter by effect"><option value="all">Any effect</option>' + tags + '</select>' +
     '<select class="sel" data-sel="filtSel" data-k="sort" aria-label="Sort"><option value="tier"' + (f.sort === 'tier' ? ' selected' : '') + '>Sort: tier</option><option value="name"' + (f.sort === 'name' ? ' selected' : '') + '>Sort: A to Z</option><option value="new"' + (f.sort === 'new' ? ' selected' : '') + '>Sort: newest first</option></select></div></div>';
@@ -1426,6 +1441,27 @@ var PRI = ['crit', 'attack-speed', 'execute', 'freeze', 'stun', 'slow', 'collaps
   'equipment-cd', 'drone', 'summon', 'ally', 'interactable', 'economy', 'aoe', 'projectile', 'defense', 'damage', 'utility'];
 var GENERIC = {damage:1, utility:1, aoe:1, defense:1, 'chance-based':1, 'on-hit':1};
 var cache = {};
+/* a small mark in the top-left corner says what kind of item it is, so the shape reads even when two glyphs look alike */
+var PIP = {
+  Damage:'<path d="M4 1l3.3 6H.7z" fill="currentColor"/>',
+  Defense:'<rect x="1" y="1" width="6" height="6" rx="1.3" fill="currentColor"/>',
+  Healing:'<path d="M4 1v6M1 4h6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',
+  Mobility:'<path d="M2 1l4 3-4 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  Utility:'<circle cx="4" cy="4" r="3" fill="currentColor"/>',
+  Allies:'<circle cx="4" cy="4" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+};
+var KEYCAT = {};
+['crit', 'attack-speed', 'execute', 'collapse', 'bleed', 'burn', 'poison', 'proc-chain', 'on-hit', 'chance-based', 'boss-damage', 'aoe', 'projectile', 'damage'].forEach(function(k){ KEYCAT[k] = 'Damage'; });
+['barrier', 'shield', 'armor', 'defense', 'health-scaling'].forEach(function(k){ KEYCAT[k] = 'Defense'; });
+['regen', 'healing'].forEach(function(k){ KEYCAT[k] = 'Healing'; });
+['jump', 'sprint', 'mobility'].forEach(function(k){ KEYCAT[k] = 'Mobility'; });
+['drone', 'summon', 'ally'].forEach(function(k){ KEYCAT[k] = 'Allies'; });
+function catOf(it, key){
+  if(KEYCAT[key]) return KEYCAT[key];
+  var tags = it.tags || [], found = null;
+  (R.CATS || []).forEach(function(c){ if(!found && tags.some(function(t){ return c[1].indexOf(t) >= 0; })) found = c[0]; });
+  return found || 'Utility';
+}
 function glyphKey(it){
   var tags = it.tags || [], k = null;
   for(var i = 0; i < PRI.length; i++) if(tags.indexOf(PRI[i]) >= 0){ k = PRI[i]; break; }
@@ -1441,14 +1477,16 @@ function glyphKey(it){
 function itemIcon(it, size){
   size = size || 36;
   var key = it.id + ':' + size; if(cache[key]) return cache[key];
-  var g = G[glyphKey(it)] || G.fallback, init = String(it.name || '?').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase();
+  var gk = glyphKey(it), cat = catOf(it, gk), ps = Math.max(7, Math.round(size * .26));
+  var g = G[gk] || G.fallback, init = String(it.name || '?').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase();
   var fs = Math.max(8, Math.round(size * .27));
   var html = '<span class="ic t-' + esc(it.tier) + '" style="--c:' + R.colorOfItem(it) + ';width:' + size + 'px;height:' + size + 'px" aria-hidden="true">' +
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + g + '</svg>' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + g + '</svg><svg class="cp" viewBox="0 0 8 8" width="' + ps + '" height="' + ps + '" aria-hidden="true">' + PIP[cat] + '</svg>' +
     '<i style="font-size:' + fs + 'px">' + esc(init) + '</i></span>';
   cache[key] = html; return html;
 }
-R.itemIcon = itemIcon; R.glyphKey = glyphKey; R.GLYPHS = G;
+R.itemIcon = itemIcon; R.glyphKey = glyphKey; R.GLYPHS = G; R.catOf = function(it){ return catOf(it, glyphKey(it)); };
+R.pipKey = function(){ return ['Damage', 'Defense', 'Healing', 'Mobility', 'Utility', 'Allies'].map(function(c){ return '<span class="pk"><svg viewBox="0 0 8 8" width="10" height="10" aria-hidden="true">' + PIP[c] + '</svg>' + c + '</span>'; }).join(''); };
 })();
 
 (function(){
@@ -1516,7 +1554,7 @@ function isEquip(it){ return it.tier === 'equipment' || it.tier === 'elite'; }
 /* ============ state ============ */
 function defaults(){
   return {v:1, active:false, surv:'', skills:{}, build:-1, diff:'Rainstorm', arts:[], dlc:store.get('dlcOwned', {sotv:true, sots:true, ac:true, hc:true}),
-    goals:['escape'], stages:[], items:{}, log:[], last:'', targets:[], equipSeen:[], doneRun:[], recent:[], ui:{}};
+    goals:['escape'], stages:[], items:{}, log:[], last:'', targets:[], equipSeen:[], doneRun:[], recent:[], clock:{base:0, since:0}, players:1, ui:{}};
 }
 function load(){
   var r = store.get('run', null);
@@ -1524,6 +1562,9 @@ function load(){
   var d = defaults();
   Object.keys(d).forEach(function(k){ if(r[k] == null) r[k] = d[k]; });
   r.items = r.items || {}; r.targets = asArr(r.targets); r.equipSeen = asArr(r.equipSeen); r.recent = asArr(r.recent).filter(function(id){ return IBY[id]; }).slice(0, 8); r.doneRun = asArr(r.doneRun); r.stages = asArr(r.stages); r.log = asArr(r.log); r.arts = asArr(r.arts); r.goals = asArr(r.goals);
+  var ck = r.clock || {}; r.clock = {base:Math.max(0, +ck.base || 0), since:Math.max(0, +ck.since || 0)};
+  if(r.clock.since && Date.now() - r.clock.since > 4 * 3600000){ r.clock.since = 0; r.clock.stale = true; }
+  r.players = Math.max(1, Math.min(4, Math.round(+r.players || 1)));
   r.ui = {};
   return r;
 }
@@ -1545,6 +1586,39 @@ function undo(){
   r.items = e.items; r.stages = e.stages; if(e.equipSeen) r.equipSeen = e.equipSeen; r.last = 'Undid: ' + e.label; save();
 }
 function owned(dlc){ return !dlc || dlc === 'base' || !!S.run.dlc[dlc]; }
+
+
+/* ============ run clock and enemy pressure ============
+   Formulas from the Risk of Rain 2 wiki (Difficulty page): playerFactor = 1 + 0.3 x (players - 1);
+   timeFactor = 0.0506 x difficultyValue x players^0.2; stageFactor = 1.15^stagesCompleted;
+   coefficient = (playerFactor + minutes x timeFactor) x stageFactor; enemy level = 1 + (coefficient - playerFactor) / 0.33;
+   each level gives enemies +30% health and +20% damage over base. Drizzle, Rainstorm and Monsoon are 1, 2 and 3.
+   Eclipse levels use Monsoon's scaling here; their extra modifiers are not modeled. The band targets below are rules of thumb. */
+var DIFF_VALUE = {Drizzle:1, Rainstorm:2, Monsoon:3};
+function diffValue(name){ return DIFF_VALUE[name] || 3; }
+function clockMs(){ var c = S.run.clock; return Math.max(0, c.base + (c.since ? Date.now() - c.since : 0)); }
+function clockRunning(){ return !!S.run.clock.since; }
+function clockStart(){ var c = S.run.clock; if(!c.since) c.since = Date.now(); delete c.stale; save(); }
+function clockPause(){ var c = S.run.clock; if(c.since){ c.base += Date.now() - c.since; c.since = 0; } save(); }
+function clockSet(ms){ var c = S.run.clock, going = !!c.since; c.base = Math.max(0, Math.round(ms)); c.since = going ? Date.now() : 0; delete c.stale; save(); }
+function stagesDone(){ var cm = curMain(); return cm ? Math.max(0, cm.n - 1) : 0; }
+var BANDS = [
+  {k:'calm', label:'Calm', min:0, need:{Defense:0, Healing:0, Mobility:0}},
+  {k:'rising', label:'Rising', min:6, need:{Defense:1, Healing:1, Mobility:0}},
+  {k:'dangerous', label:'Dangerous', min:12, need:{Defense:2, Healing:1, Mobility:1}},
+  {k:'severe', label:'Severe', min:20, need:{Defense:3, Healing:2, Mobility:1}},
+  {k:'brutal', label:'Brutal', min:32, need:{Defense:4, Healing:2, Mobility:2}}
+];
+function pressure(o){
+  o = o || {}; var r = S.run, min = o.min != null ? o.min : clockMs() / 60000, done = o.done != null ? o.done : stagesDone();
+  var dv = diffValue(o.diff || r.diff), pc = Math.max(1, o.players || r.players || 1);
+  var pf = 1 + .3 * (pc - 1), tf = .0506 * dv * Math.pow(pc, .2), sf = Math.pow(1.15, done);
+  var coeff = (pf + min * tf) * sf, level = Math.min(99, 1 + (coeff - pf) / .33), L = level - 1, band = BANDS[0];
+  BANDS.forEach(function(b){ if(level >= b.min) band = b; });
+  return {coeff:coeff, level:level, band:band, hpX:1 + .3 * L, dmgX:1 + .2 * L, perMin:tf * sf / .33, perStage:coeff * .15 / .33, dv:dv, players:pc, done:done, min:min,
+    w:{def:Math.min(1.1, .05 * dv + .035 * L), heal:Math.min(.8, .03 * dv + .025 * L), mob:Math.min(.5, .012 * L)}};
+}
+function inCat(c, name){ var cat = R.CATS.filter(function(x){ return x[0] === name; })[0]; return !!cat && hits(c, cat[1]).length > 0; }
 
 /* ============ items ============ */
 function heldIds(){
@@ -1641,12 +1715,12 @@ function logStage(i, n){
   var isMoon = s.name === 'Commencement' || s.tier === 'final';
   var num = isMoon ? (curMain() ? curMain().n : n) : n;
   snap((isMoon ? '' : 'Stage ' + num + ': ') + s.name);
-  r.stages.push({k:'main', n:num, name:s.name, sid:i, portals:[]});
+  r.stages.push({k:'main', n:num, name:s.name, sid:i, portals:[], t:clockMs()});
   save();
 }
 function logSide(i){
   var rl = REALMS[i]; if(!rl) return;
-  snap('Side trip: ' + rl.name); S.run.stages.push({k:'side', name:rl.name, ri:i}); save();
+  snap('Side trip: ' + rl.name); S.run.stages.push({k:'side', name:rl.name, ri:i, t:clockMs()}); save();
 }
 function stageBack(){
   var r = S.run; if(!r.stages.length) return;
@@ -1704,7 +1778,7 @@ function rank(filter, opts){
   var goals = r.goals.map(function(id){ return GBY[id]; }).filter(Boolean);
   var lvl = Math.max(0, DIFFS.indexOf(r.diff)), glass = r.arts.indexOf('artifact-of-glass') >= 0;
   var cm = curMain(), stageN = cm ? cm.n : 1, cc = catCounts(ids), equipped = ids.filter(function(i){ return isEquip(IBY[i]); })[0];
-  var cmd = cmdOn(), out = [];
+  var cmd = cmdOn(), out = [], pr = pressure();
   ITEMS.forEach(function(c){
     if(!R.HELDABLE(c) || !owned(c.dlc) || !filter(c)) return;
     if(cmd && (LOCKED[c.id] || c.id === MICRO)) return;
@@ -1733,8 +1807,15 @@ function rank(filter, opts){
       if(gb > .05){ score += gb; if(best && best.m.length) flags.push({cls:'goal', t:'Goal: ' + best.g.name + ' (' + best.m.slice(0, 2).map(R.tagLabel).join(', ').toLowerCase() + ')'}); }
     }
     /* difficulty, gaps, early economy */
-    if(hits(c, DEFT).length && lvl) score += Math.min(.8, .07 * lvl);
-    if(n >= 3){
+    var pw = 0, thin = null;
+    if(inCat(c, 'Defense')) pw += pr.w.def;
+    if(inCat(c, 'Healing')) pw += pr.w.heal;
+    if(inCat(c, 'Mobility')) pw += pr.w.mob;
+    pw = Math.min(1.2, pw); if(pw > .05) score += pw;
+    ['Defense', 'Healing', 'Mobility'].forEach(function(cn){ if(!thin && cc[cn] < pr.band.need[cn] && inCat(c, cn)) thin = cn; });
+    if(thin){ score += .6; flags.push({cls:'ok', t:thin + ' is thin for level ' + Math.round(pr.level) + ' enemies (' + cc[thin] + ' of ' + pr.band.need[thin] + ')'}); }
+    else if(pw >= .35) flags.push({cls:'', t:'Helps at enemy level ' + Math.round(pr.level)});
+    if(n >= 3 && !thin){
       var gap = null;
       R.CATS.forEach(function(cat){
         if(gap || cc[cat[0]] > 0) return;
@@ -1789,7 +1870,7 @@ function band(p){
 }
 
 R.RUN = {GOALS:GOALS, GBY:GBY, DIFFS:DIFFS, DLC_KEYS:DLC_KEYS, PICK:PICK, PBY:PBY, isEquip:isEquip, run:run, save:save, snap:snap, undo:undo, owned:owned,
-  heldIds:heldIds, addItem:addItem, removeN:removeN, prioMaps:prioMaps, decItem:decItem, rmItem:rmItem, clearItems:clearItems, mirror:mirror, curBuild:curBuild, skillMatch:skillMatch, autoBuild:autoBuild, defaultSkills:defaultSkills,
+  heldIds:heldIds, addItem:addItem, removeN:removeN, prioMaps:prioMaps, decItem:decItem, rmItem:rmItem, clearItems:clearItems, mirror:mirror, clockMs:clockMs, clockRunning:clockRunning, clockStart:clockStart, clockPause:clockPause, clockSet:clockSet, stagesDone:stagesDone, pressure:pressure, BANDS:BANDS, diffValue:diffValue, curBuild:curBuild, skillMatch:skillMatch, autoBuild:autoBuild, defaultSkills:defaultSkills,
   mainStages:mainStages, curMain:curMain, curEntry:curEntry, tierNum:tierNum, nextN:nextN, pool:pool, logStage:logStage, logSide:logSide, stageBack:stageBack,
   togglePortal:togglePortal, routeIdx:routeIdx, stepMatches:stepMatches, catCounts:catCounts, rank:rank, band:band, isLocked:isLocked, setLocked:setLocked, clearLocked:clearLocked, cmdOn:cmdOn, rebirthOn:rebirthOn, artUnlocked:artUnlocked, unlockArt:unlockArt, lockArt:lockArt, bankPick:bankPick, lockedCount:function(f){ return ITEMS.filter(function(i){ return LOCKED[i.id] && R.HELDABLE(i) && owned(i.dlc) && f(i); }).length; }, defaults:defaults, load:load};
 })();
@@ -2102,7 +2183,7 @@ function setupView(){
     }
   }
   /* 3 difficulty */
-  h += sec(3, 'Difficulty', 'Higher levels weight defense and healing more.', '<div class="chips wrapped">' + RR.DIFFS.map(function(d){ return '<button class="chip" data-act="rdiff" data-v="' + d + '"' + pressed(r.diff === d) + '>' + d + '</button>'; }).join('') + '</div>' + diffInfo(r.diff));
+  h += sec(3, 'Difficulty', 'Higher levels weight defense and healing more.', '<div class="chips wrapped">' + RR.DIFFS.map(function(d){ return '<button class="chip" data-act="rdiff" data-v="' + d + '"' + pressed(r.diff === d) + '>' + d + '</button>'; }).join('') + '</div>' + diffInfo(r.diff) + '<div class="slot-n" style="margin-top:12px">Players</div><div class="chips wrapped">' + [1, 2, 3, 4].map(function(n){ return '<button class="chip" data-act="rplayers" data-v="' + n + '"' + pressed(r.players === n) + '>' + n + '</button>'; }).join('') + '</div><p class="small muted info">Enemy level estimates use the player count, since more players make the game harder.</p>');
   /* 4 artifacts */
   var have = RR.artUnlocked(), mine = R.ART.filter(function(a){ return have.indexOf(a.id) >= 0; }), rest = R.ART.filter(function(a){ return have.indexOf(a.id) < 0; });
   var ah = '<div class="chips wrapped">' + (mine.length ? mine.map(function(a){ return '<button class="chip" data-act="rart" data-id="' + a.id + '"' + pressed(r.arts.indexOf(a.id) >= 0) + '>' + esc(a.name.replace(/^Artifact of /, '')) + '</button>'; }).join('') : '<span class="small muted">No artifacts unlocked yet.</span>') + '</div>';
@@ -2223,6 +2304,81 @@ function ctxLine(){
   if(g.length) parts.push('goal ' + g.join(' + '));
   return parts.join(', ');
 }
+
+
+/* ---------------- run clock and enemy pressure ---------------- */
+function fmtClock(ms){
+  var s = Math.floor(Math.max(0, ms) / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return (h ? h + ':' + (m < 10 ? '0' : '') + m : m) + ':' + (ss < 10 ? '0' : '') + ss;
+}
+function parseClock(t){
+  t = String(t || '').trim(); if(!t) return null;
+  var p = t.split(':'); if(p.length > 3) return null;
+  var n = p.map(function(x){ return x.trim() === '' ? NaN : +x; }); if(n.some(function(x){ return isNaN(x) || x < 0; })) return null;
+  var s = p.length === 1 ? n[0] * 60 : (p.length === 2 ? n[0] * 60 + n[1] : n[0] * 3600 + n[1] * 60 + n[2]);
+  return s > 86400 ? null : s * 1000;
+}
+function fx(v){ return (v < 10 ? v.toFixed(1) : String(Math.round(v))) + 'x'; }
+var BAND_BADGE = {calm:'ok', rising:'', dangerous:'warn', severe:'bad', brutal:'bad'};
+function diffNote(d){
+  if(d === 'Drizzle') return 'Drizzle: the clock moves at half of Rainstorm\'s pace and you get +70 armor.';
+  if(d === 'Monsoon') return 'Monsoon: the clock moves 50% faster than Rainstorm\'s.';
+  if(/^Eclipse/.test(d)) return d + ' uses Monsoon\'s pace. Its extra Eclipse modifiers are not counted here.';
+  return '';
+}
+function readoutHtml(){
+  var r = run(), p = RR.pressure(), cc = RR.catCounts(RR.heldIds()), need = p.band.need;
+  var keys = ['Defense', 'Healing', 'Mobility'].filter(function(k){ return need[k] > 0; });
+  var have = keys.map(function(k){ return '<span class="' + (cc[k] < need[k] ? 'warnc' : 'okc') + '">' + k.toLowerCase() + ' ' + cc[k] + ' of ' + need[k] + '</span>'; }).join(', ');
+  var h = '<div class="rdl"><b>Enemy level ' + Math.round(p.level) + '</b><span class="badge ' + BAND_BADGE[p.band.k] + '">' + p.band.label + '</span></div>';
+  h += '<div class="small muted">Enemies have about ' + fx(p.hpX) + ' the health and ' + fx(p.dmgX) + ' the damage of a level 1 enemy.</div>';
+  h += '<div class="small muted">The clock adds about ' + p.perMin.toFixed(1) + ' levels a minute right now. Each stage you clear adds about ' + p.perStage.toFixed(1) + ' more.</div>';
+  h += keys.length ? '<div class="small">Defenses suggested for this level: ' + have + '. Your picks lean toward whatever is short.</div>' : '<div class="small">Still early. Damage and economy come first.</div>';
+  var dn = diffNote(r.diff); if(dn) h += '<div class="small faint">' + esc(dn) + '</div>';
+  return h;
+}
+function splitsHtml(){
+  var m = run().stages.filter(function(s){ return s.k === 'main' && s.t != null; });
+  if(m.length < 2) return '';
+  var L = []; for(var i = 0; i < m.length - 1; i++) L.push('Stage ' + m[i].n + ' ' + fmtClock(m[i + 1].t - m[i].t));
+  return '<div class="small muted splits">Time per stage: ' + L.slice(-5).join(', ') + '</div>';
+}
+function clockCard(){
+  var r = run(), going = RR.clockRunning(), u = r.ui;
+  var h = '<div class="card rclock"><div class="rcrow"><div><div class="rs-k">Run clock' + (r.players > 1 ? ' (' + r.players + ' players)' : '') + '</div><div class="clk" id="clk-t">' + fmtClock(RR.clockMs()) + '</div></div>' +
+    '<div class="rcbtns"><button class="btn small" data-act="rclk">' + (going ? 'Pause' : 'Resume') + '</button><button class="btn small" data-act="rclkedit" aria-expanded="' + (u.clkEdit ? 'true' : 'false') + '">Match game</button></div></div>';
+  if(r.clock.stale && !going) h += '<div class="small warnc">The clock paused while the app was closed for a long time. Tap Match game to set it.</div>';
+  if(u.clkEdit){
+    h += '<div class="rcedit"><label class="small muted" for="clkin">Time shown in the game</label><div class="fl"><input id="clkin" class="tin" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="m:ss, for example 12:30" value="' + esc(u.clkVal || '') + '"><button class="btn small primary" data-act="rclkset">Set</button><button class="btn small" data-act="rclkno">Cancel</button></div>' +
+      (u.clkMsg ? '<div class="small warnc" role="status">' + esc(u.clkMsg) + '</div>' : '') + '<div class="small faint">Loading screens do not count in the game, so match it now and then.</div></div>';
+  }
+  h += '<div id="clk-read">' + readoutHtml() + '</div>' + splitsHtml() + '</div>';
+  return h;
+}
+var lastRead = 0, lastBand = '';
+setInterval(function(){
+  var r = run(); if(!r || !r.active) return;
+  var el = R.$('#clk-t'); if(!el) return;
+  el.textContent = fmtClock(RR.clockMs());
+  var now = Date.now(); if(now - lastRead < 10000) return; lastRead = now;
+  var box = R.$('#clk-read'); if(box) box.innerHTML = readoutHtml();
+  var b = RR.pressure().band.k;
+  if(lastBand && b !== lastBand){
+    var ae = document.activeElement; if(!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) && !r.ui.sheet) R.render(true);
+  }
+  lastBand = b;
+}, 1000);
+ACTS.rclk = function(){ if(RR.clockRunning()) RR.clockPause(); else RR.clockStart(); rerender(); };
+ACTS.rclkedit = function(){ var u = run().ui; u.clkEdit = !u.clkEdit; u.clkMsg = ''; u.clkVal = ''; rerender(); if(u.clkEdit){ var i = R.$('#clkin'); if(i) i.focus(); } };
+ACTS.rclkno = function(){ var u = run().ui; u.clkEdit = false; u.clkMsg = ''; rerender(); };
+ACTS.rclkset = function(){
+  var u = run().ui, i = R.$('#clkin'), v = i ? i.value : '', ms = parseClock(v);
+  u.clkVal = v;
+  if(ms == null){ u.clkMsg = 'Enter the time like 12:30 (minutes:seconds), or just minutes.'; rerender(); var j = R.$('#clkin'); if(j) j.focus(); return; }
+  RR.clockSet(ms); u.clkEdit = false; u.clkMsg = ''; u.clkVal = ''; lastRead = 0; rerender();
+};
+ACTS.rplayers = function(el){ var r = run(); r.players = Math.max(1, Math.min(4, +el.dataset.v || 1)); RR.save(); rerender(); };
+R.clk = {fmt:fmtClock, parse:parseClock, readout:readoutHtml};
 
 /* ---------------- sheets ---------------- */
 function sheet(title, sub, bodyHtml, head2){
@@ -2549,7 +2705,7 @@ function histEntry(){
   var r = run(), cm = RR.curMain(), sv = SBY[r.surv], cb = RR.curBuild();
   return {t:Date.now(), surv:r.surv, sname:sv ? sv.name : 'Unknown', build:cb ? cb.b.name : '', diff:r.diff,
     arts:r.arts.map(function(id){ return R.ABY[id] ? R.ABY[id].name.replace(/^Artifact of /, '') : id; }), goals:r.goals.slice(),
-    n:cm ? cm.n : 0, stage:cm ? cm.name : '', items:RR.heldIds().map(function(id){ return {id:id, n:r.items[id]}; }),
+    n:cm ? cm.n : 0, stage:cm ? cm.name : '', ms:RR.clockMs(), lvl:Math.round(RR.pressure().level), players:r.players, items:RR.heldIds().map(function(id){ return {id:id, n:r.items[id]}; }),
     outcome:r.ui.outcome || '', done:asArr(r.doneRun).map(function(id){ return U.BY[id] ? U.BY[id].label : id; })};
 }
 function histStats(){
@@ -2562,7 +2718,7 @@ function histRow(e){
   var tot = its.reduce(function(a, x){ return a + x.n; }, 0), top = its.slice(0, 8).map(function(x){ return esc(IBY[x.id].name) + (x.n > 1 ? ' x' + x.n : ''); }).join(', ');
   var loops = e.n > 5 ? ', loop ' + Math.floor((e.n - 1) / 5) : '';
   var h = '<div class="hist"><div class="hh"><b>' + esc(e.sname) + '</b><span class="badge ' + (e.outcome === 'won' ? 'ok' : (e.outcome === 'died' ? 'bad' : '')) + '">' + esc(oc ? oc[1] : 'Not recorded') + '</span><span class="small faint">' + esc(when) + '</span></div>';
-  h += '<div class="small muted">' + esc(e.diff) + (e.build ? ', ' + esc(e.build) : '') + (e.n ? '. Reached stage ' + e.n + esc(loops) + (e.stage ? ' (' + esc(e.stage) + ')' : '') : '. No stage logged') + '</div>';
+  h += '<div class="small muted">' + esc(e.diff) + (e.build ? ', ' + esc(e.build) : '') + (e.n ? '. Reached stage ' + e.n + esc(loops) + (e.stage ? ' (' + esc(e.stage) + ')' : '') + (e.ms ? ', ' + fmtClock(e.ms) + ' on the clock, enemy level ' + (e.lvl || 1) : '') : '. No stage logged') + '</div>';
   if(asArr(e.arts).length) h += '<div class="small muted">Artifacts: ' + e.arts.map(esc).join(', ') + '</div>';
   if(its.length) h += '<div class="small">Items (' + tot + '): ' + top + (its.length > 8 ? ', +' + (its.length - 8) + ' more' : '') + '</div>';
   if(asArr(e.done).length) h += '<div class="small"><span class="badge ok">Unlocked</span> ' + e.done.map(esc).join(', ') + '</div>';
@@ -2596,7 +2752,7 @@ function controls(){
 VIEWS.run = function(){
   var r = run();
   if(!r.active || r.ui.edit) return setupView();
-  var h = summaryCard() + rebirthCard() + stageCard() + tierGrid() + quickRow() + lastLine() + targetsCard() + topPicks() + buildSection() + artifactsSection() + controls() + historyCard() + backupCard();
+  var h = summaryCard() + rebirthCard() + stageCard() + clockCard() + tierGrid() + quickRow() + lastLine() + targetsCard() + topPicks() + buildSection() + artifactsSection() + controls() + historyCard() + backupCard();
   var sh = r.ui.sheet;
   if(sh){
     if(sh.k === 'picker') h += pickerSheet(sh.t);
@@ -2621,7 +2777,7 @@ ACTS.rgoal = function(el){ var r = run(), id = el.dataset.id, k = r.goals.indexO
 ACTS.rstart = function(){
   var r = run(); if(!r.surv) return;
   if(!Object.keys(r.skills).length) r.skills = RR.defaultSkills(r.surv);
-  r.active = true; r.ui.edit = false; r.items = {}; r.recent = []; r.equipSeen = []; r.stages = []; r.log = []; r.last = '';
+  r.active = true; r.ui.edit = false; r.clock = {base:0, since:Date.now()}; r.items = {}; r.recent = []; r.equipSeen = []; r.stages = []; r.log = []; r.last = '';
   r.ui.sheet = {k:'stage'}; RR.save(); R.render(); window.scrollTo(0, 0);
 };
 ACTS.redit = function(){ setUi('edit', true); R.render(); window.scrollTo(0, 0); };
@@ -2630,7 +2786,7 @@ ACTS.rend = function(){
   var r = run();
   if(!r.ui.confirmEnd){ r.ui.confirmEnd = true; rerender(); return; }
   if(histWorthy()){ HIST.unshift(histEntry()); HIST.splice(100); histSave(); }
-  var keep = {surv:r.surv, skills:r.skills, diff:r.diff, arts:r.arts, goals:r.goals, dlc:r.dlc, targets:r.targets.filter(function(id){ return U.BY[id] && !U.isDone(U.BY[id]); })};
+  var keep = {surv:r.surv, skills:r.skills, diff:r.diff, players:r.players, arts:r.arts, goals:r.goals, dlc:r.dlc, targets:r.targets.filter(function(id){ return U.BY[id] && !U.isDone(U.BY[id]); })};
   S.run = RR.defaults(); S.run.ui = {}; Object.keys(keep).forEach(function(k){ S.run[k] = keep[k]; });
   RR.save(); R.render(); window.scrollTo(0, 0);
 };
@@ -3128,7 +3284,7 @@ R.render();
 /* Standalone loader: keeps a second copy of every saved value in IndexedDB, restores it if the browser cleared
    localStorage, asks the browser to protect storage, then starts the app. */
 (function(){
-  window.ROR_STANDALONE = true; window.ROR_MEM = {}; window.ROR_BUILD = 'b5962a4';
+  window.ROR_STANDALONE = true; window.ROR_MEM = {}; window.ROR_BUILD = '24d9b4a';
   var DB = 'ror2-mirror', ST = 'kv', db = null, pend = {}, timer = 0, started = false;
   function openDb(cb){
     try{
